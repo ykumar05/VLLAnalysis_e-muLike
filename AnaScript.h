@@ -444,9 +444,9 @@ public:
   struct Hists {
     //Histograms are declared here.
     TH1F *nevt;
-    TH1F *acceptance;
+    TH1F *acceptance[5];
     TH1F *decayMode[5];
-    
+
     //Histogram Declaration for final states
     TH1F *hist_l3[100];
     TH1F *hist_l4[100];
@@ -501,7 +501,7 @@ private:
   int _verbosity,_exclude,_sample;
   int nEvtTotal,nEvtRan,nEvtTrigger;
   int _data, _lep, _year,_mcwt;
-  bool passTrigger, GoodEvt, GoodEvt2016, GoodEvt2017, GoodEvt2018,triggerRes,trigger2016,trigger2017,trigger2018;
+  bool evt_trigger, passTrigger, GoodEvt, GoodEvt2016, GoodEvt2017, GoodEvt2018,triggerRes,trigger2016,trigger2017,trigger2018;
   bool is_l2OS_event, is_l2SS_event, is_l3_event, is_l4_event, is_l12j_event;
   int n_l2OS, n_l2SS, n_l3, n_l4, n_l12j; 
   float metpt, metphi,evwt,prob,evtwt,prob1,puppimetpt,puppimetphi;

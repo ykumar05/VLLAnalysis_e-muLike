@@ -56,7 +56,7 @@ void AnaScript::VLLDoublet()
     temp.status = GenPart_status[i];
     temp.ind = i;
     temp.pdgid = GenPart_pdgId[i];
-
+    
     bool passcutVLLDoublet = abs(temp.pdgid)==17;
     bool motherisnotVLLDoublet = abs(GenPart_pdgId[GenPart_genPartIdxMother[i]])!=17; //Mother used directly since it is an unstable particle
     passcutVLLDoublet = passcutVLLDoublet && motherisnotVLLDoublet; 

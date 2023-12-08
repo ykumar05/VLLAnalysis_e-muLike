@@ -81,7 +81,7 @@ void AnaScript::createLightLeptons(){
 	isprompt = true;
     }
     bool passcut_looseele = ptetacut && Electron_cutBased[i]>1 && isprompt;
-    bool passcut_mediumele = ptetacut && isprompt && Electron_cutBased[i]>2 && cleaned_from_muons;
+    bool passcut_mediumele = ptetacut && isprompt && Electron_cutBased[i]>2 && cleaned_from_muons && Electron_pfRelIso03_all[i] < 0.15;
 
     //GenMatching Electrons
     float dRMin_Electron_GenElectron = 1000.0;
@@ -119,6 +119,48 @@ void AnaScript::createLightLeptons(){
 }
 
 /***********************************
+ *               Taus              *
+ ***********************************/
+void AnaScript::createTaus(){
+  for(unsigned int i=0; i< (*nTau); i++){
+    //Set the energy corrections according the decay modes:
+    float tlv_corr = 1.;
+    if(_year==2016){
+      if(Tau_decayMode[i]==0)  tlv_corr = 0.994;
+      if(Tau_decayMode[i]==1)  tlv_corr = 0.995;
+      if(Tau_decayMode[i]>9)   tlv_corr = 1;
+    }
+    if(_year==2017){
+      if(Tau_decayMode[i]==0)  tlv_corr = 1.007;
+      if(Tau_decayMode[i]==1)  tlv_corr = 0.998;
+      if(Tau_decayMode[i]==10) tlv_corr = 1.001;
+      if(Tau_decayMode[i]==11) tlv_corr = 0.999;
+    }
+    if(_year==2018){
+      if(Tau_decayMode[i]==0)  tlv_corr = 0.987;
+      if(Tau_decayMode[i]==1)  tlv_corr = 0.995;
+      if(Tau_decayMode[i]==10) tlv_corr = 0.998;
+      if(Tau_decayMode[i]==11) tlv_corr = 1;
+    }
+
+    Particle temp;
+    temp.v.SetPtEtaPhiM(Tau_pt[i],Tau_eta[i],Tau_phi[i],1.77);
+    temp.v *= tlv_corr; //energy correction
+    temp.id = -15*Tau_charge[i];
+    temp.ind = i;
+    
+    bool ptetacut = temp.v.Pt()>20 && fabs(temp.v.Eta())<2.3;
+    bool cleaned_from_leptons = clean_from_array(temp, loosellep, 0.5);
+    bool DeepTauID= Tau_idDeepTau2017v2p1VSe[i]>15 && Tau_idDeepTau2017v2p1VSmu[i]>3 && Tau_idDeepTau2017v2p1VSjet[i]>127;
+    bool passcut = ptetacut && DeepTauID && cleaned_from_leptons && fabs(Tau_dz[i]<0.2);
+
+    if(passcut)
+      Tau.push_back(temp);
+
+  }
+}
+
+/***********************************
  *              Jets               *
  ***********************************/
 void AnaScript::createJets(){
@@ -129,8 +171,9 @@ void AnaScript::createJets(){
     
     bool ptetacut = temp.v.Pt()>30 && fabs(temp.v.Eta())<2.4;
     bool cleaned_from_leptons = clean_from_array(temp, loosellep, 0.5);
+    bool cleaned_from_taus = clean_from_array(temp, Tau, 0.5);
     bool jetID = _year == 2016 ? Jet_jetId[i]>=1 : Jet_jetId[i]>=2; //if 2016, >=1; else >=2
-    bool passcut = ptetacut && cleaned_from_leptons && jetID;
+    bool passcut = ptetacut && cleaned_from_leptons && cleaned_from_taus && jetID;
     
     if(passcut){
       Jets.push_back(temp);

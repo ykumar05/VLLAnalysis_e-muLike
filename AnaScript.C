@@ -98,7 +98,10 @@ Bool_t AnaScript::Process(Long64_t entry)
   if(GoodEvt){
     nEvtRan++; //only good events
     h.nevt->Fill(1);
-    h.acceptance->Fill(0);
+    h.acceptance[0]->Fill(0);
+    h.acceptance[1]->Fill(0);
+    h.acceptance[2]->Fill(0);
+    h.acceptance[3]->Fill(0);
     triggerRes=true; //Always true for MC
     
     if(_data==1){
@@ -137,16 +140,24 @@ Bool_t AnaScript::Process(Long64_t entry)
       //VLL Doublet Plots      
       h.vllD[0]->Fill((int)genVLLDoublet.size());
       h.vllNuD[0]->Fill((int)genVLLNuDoublet.size());
+      bool is_LL = false;
+      bool is_LN = false;
+      bool is_NN = false;
       if((int)genVLLDoublet.size()>1)
-	if(abs(genVLLDoublet.at(0).pdgid) == 17 && abs(genVLLDoublet.at(1).pdgid) == 17) //LL
+	if(abs(genVLLDoublet.at(0).pdgid) == 17 && abs(genVLLDoublet.at(1).pdgid) == 17){ //LL
 	  h.decayMode[2]->Fill(1);
+	  is_LL = true;
+	}
       if((int)genVLLDoublet.size()>0 && (int)genVLLNuDoublet.size()>0)
-	if(abs(genVLLDoublet.at(0).pdgid) == 17 && abs(genVLLNuDoublet.at(0).pdgid) == 18) //LN
+	if(abs(genVLLDoublet.at(0).pdgid) == 17 && abs(genVLLNuDoublet.at(0).pdgid) == 18){ //LN
 	  h.decayMode[2]->Fill(2);
+	  is_LN = true;
+	}
       if((int)genVLLNuDoublet.size()>1)
-	if(abs(genVLLNuDoublet.at(0).pdgid) == 18 && abs(genVLLNuDoublet.at(1).pdgid) == 18) //NN
+	if(abs(genVLLNuDoublet.at(0).pdgid) == 18 && abs(genVLLNuDoublet.at(1).pdgid) == 18){ //NN
 	  h.decayMode[2]->Fill(3);
-      
+	  is_NN = true;
+	}
       
       /*******************************************************
        *               Reco particle block                   *
@@ -156,11 +167,13 @@ Bool_t AnaScript::Process(Long64_t entry)
       Electron.clear();
       LightLepton.clear();
       loosellep.clear();
+      Tau.clear();
       Jets.clear();
       bJets.clear();
 
       //Calling the function that consists the electron and muons block
       createLightLeptons();
+      createTaus();
       createJets();
       
       //Sorting the arrays
@@ -168,6 +181,7 @@ Bool_t AnaScript::Process(Long64_t entry)
       SortPt(Electron);
       SortPt(LightLepton);
       SortPt(loosellep);
+      SortPt(Tau);
       SortPt(Jets);
       //Basic object-level plots:
 
@@ -241,204 +255,227 @@ Bool_t AnaScript::Process(Long64_t entry)
       is_l12j_event = false;
       is_l3_event   = false;
       is_l4_event   = false;
-      if((int)LightLepton.size()>0){
-	passTrigger=false;
-	if(abs(LightLepton.at(0).id)==13 && LightLepton.at(0).v.Pt()>26)              // Muon PT>26 GeV
-	  passTrigger=true;
-	if(abs(LightLepton.at(0).id)==11 && LightLepton.at(0).v.Pt()>32)              // Ele PT >32 GeV
-	  passTrigger=true;
-	
-	if(passTrigger){
-	  //4L Inclusive
-	  if((int)LightLepton.size() > 3){
-	    is_l4_event = true;
-	    n_l4++;
-	    h.acceptance->Fill(1);
-	  }
-	  //Exactly 3L
-	  if((int)LightLepton.size() == 3){
-	    is_l3_event = true;
-	    n_l3++;
-	    h.acceptance->Fill(2);
-	  }
-	  //2L SS
-	  if((int)LightLepton.size()==2){
-	    if((LightLepton.at(0).id)*(LightLepton.at(1).id) == 169 || (LightLepton.at(0).id)*(LightLepton.at(1).id) == 121 || (LightLepton.at(0).id)*(LightLepton.at(1).id) == 143){
-	      is_l2SS_event = true;
-	      n_l2SS++;
-	      h.acceptance->Fill(3);
-	    }
-	  }
-	  else if((int)LightLepton.size()==1 && (int)Jets.size()>1){
-	    is_l12j_event = true;
-	    n_l12j++;
-	    h.acceptance->Fill(4);
-	  }
+      evt_trigger   = false;
+      
+      //4L Inclusive
+      if((int)LightLepton.size() > 3){
+	for(int i=0; i<4; i++){
+	  if( fabs(LightLepton.at(i).id) == 11 && LightLepton.at(i).v.Pt() > 32 )
+	    evt_trigger = true;
+	  if( fabs(LightLepton.at(i).id) == 13 && LightLepton.at(i).v.Pt() > 26 )
+	    evt_trigger = true;
 	}
-
-	//Event level variables for 4L Events
-	if(is_l4_event){
-	  //------>Kinematics
-	  h.hist_l4[0]->Fill((int)LightLepton.size());
-	  h.hist_l4[1]->Fill(LightLepton.at(0).v.Pt());
-	  h.hist_l4[2]->Fill(LightLepton.at(1).v.Pt());
-	  h.hist_l4[3]->Fill(LightLepton.at(2).v.Pt());
-	  h.hist_l4[4]->Fill(LightLepton.at(3).v.Pt());
-	  h.hist_l4[5]->Fill(LightLepton.at(0).v.Eta());
-	  h.hist_l4[6]->Fill(LightLepton.at(1).v.Eta());
-	  h.hist_l4[7]->Fill(LightLepton.at(2).v.Eta());
-	  h.hist_l4[8]->Fill(LightLepton.at(3).v.Eta());
-	  h.hist_l4[9]->Fill(LightLepton.at(0).v.Phi());
-	  h.hist_l4[10]->Fill(LightLepton.at(1).v.Phi());
-	  h.hist_l4[11]->Fill(LightLepton.at(2).v.Phi());
-	  h.hist_l4[12]->Fill(LightLepton.at(3).v.Phi());
-	  //------>Event Level Kinematics
-	  h.hist_l4[13]->Fill(LT);
-	  h.hist_l4[14]->Fill(*MET_pt);
-	  h.hist_l4[15]->Fill(LT_MET);
-	  //------>Angular Variables
-	  h.hist_l4[16]->Fill(delta_phi(LightLepton.at(0).v.Phi(),*MET_phi));
-	  h.hist_l4[17]->Fill(delta_phi(LightLepton.at(1).v.Phi(),*MET_phi));
-	  h.hist_l4[18]->Fill(delta_phi(LightLepton.at(2).v.Phi(),*MET_phi));
-	  h.hist_l4[19]->Fill(delta_phi(LightLepton.at(3).v.Phi(),*MET_phi));
-	  h.hist_l4[20]->Fill(delta_phi(LightLepton.at(0).v.Phi(),LightLepton.at(1).v.Phi()));
-	  h.hist_l4[21]->Fill(delta_phi(LightLepton.at(0).v.Phi(),LightLepton.at(2).v.Phi()));
-	  h.hist_l4[22]->Fill(delta_phi(LightLepton.at(0).v.Phi(),LightLepton.at(3).v.Phi()));
-	  h.hist_l4[23]->Fill(delta_phi(LightLepton.at(1).v.Phi(),LightLepton.at(2).v.Phi()));
-	  h.hist_l4[24]->Fill(delta_phi(LightLepton.at(1).v.Phi(),LightLepton.at(3).v.Phi()));
-	  h.hist_l4[25]->Fill(delta_phi(LightLepton.at(2).v.Phi(),LightLepton.at(3).v.Phi()));
-	  //------>Transverse Mass
-	  h.hist_l4[26]->Fill(transv_mass(LightLepton.at(0).v.Pt(),LightLepton.at(0).v.Phi(),*MET_pt,*MET_phi));
-	  h.hist_l4[27]->Fill(transv_mass(LightLepton.at(1).v.Pt(),LightLepton.at(1).v.Phi(),*MET_pt,*MET_phi));
-	  h.hist_l4[28]->Fill(transv_mass(LightLepton.at(2).v.Pt(),LightLepton.at(2).v.Phi(),*MET_pt,*MET_phi));
-	  h.hist_l4[29]->Fill(transv_mass(LightLepton.at(3).v.Pt(),LightLepton.at(3).v.Phi(),*MET_pt,*MET_phi));
-	  //------>DeltaR Plots
-	  h.hist_l4[30]->Fill(LightLepton.at(0).v.DeltaR(LightLepton.at(1).v));
-	  h.hist_l4[31]->Fill(LightLepton.at(0).v.DeltaR(LightLepton.at(2).v));
-	  h.hist_l4[32]->Fill(LightLepton.at(0).v.DeltaR(LightLepton.at(3).v));
-	  h.hist_l4[33]->Fill(LightLepton.at(1).v.DeltaR(LightLepton.at(2).v));
-	  h.hist_l4[34]->Fill(LightLepton.at(1).v.DeltaR(LightLepton.at(3).v));
-	  h.hist_l4[35]->Fill(LightLepton.at(2).v.DeltaR(LightLepton.at(3).v));
-	  //Invariant Mass
-	  h.hist_l4[36]->Fill((LightLepton.at(0).v+LightLepton.at(1).v).M());
-	  h.hist_l4[37]->Fill((LightLepton.at(0).v+LightLepton.at(2).v).M());
-	  h.hist_l4[38]->Fill((LightLepton.at(0).v+LightLepton.at(3).v).M());
-	  h.hist_l4[39]->Fill((LightLepton.at(1).v+LightLepton.at(2).v).M());
-	  h.hist_l4[40]->Fill((LightLepton.at(1).v+LightLepton.at(3).v).M());
-	  h.hist_l4[41]->Fill((LightLepton.at(2).v+LightLepton.at(3).v).M());
+	if(evt_trigger){	  
+	  is_l4_event = true;
+	  n_l4++;
+	  h.acceptance[0]->Fill(1);
 	}
-	
-       	//Event level Variables for 3L events
-	if(is_l3_event){
-	  //------>Kinematics
-	  h.hist_l3[0]->Fill((int)LightLepton.size());
-	  h.hist_l3[1]->Fill(LightLepton.at(0).v.Pt());
-	  h.hist_l3[2]->Fill(LightLepton.at(1).v.Pt());
-	  h.hist_l3[3]->Fill(LightLepton.at(2).v.Pt());
-	  h.hist_l3[4]->Fill(LightLepton.at(0).v.Eta());
-	  h.hist_l3[5]->Fill(LightLepton.at(1).v.Eta());
-	  h.hist_l3[6]->Fill(LightLepton.at(2).v.Eta());
-	  h.hist_l3[7]->Fill(LightLepton.at(0).v.Phi());
-	  h.hist_l3[8]->Fill(LightLepton.at(1).v.Phi());
-	  h.hist_l3[9]->Fill(LightLepton.at(2).v.Phi());
-	  //------>Event Level Kinematics
-	  h.hist_l3[10]->Fill(LT);
-	  h.hist_l3[11]->Fill(*MET_pt);
-	  h.hist_l3[12]->Fill(LT_MET);
-	  //------>Angular Variables
-	  h.hist_l3[13]->Fill(delta_phi(LightLepton.at(0).v.Phi(),LightLepton.at(1).v.Phi()));
-	  h.hist_l3[14]->Fill(delta_phi(LightLepton.at(0).v.Phi(),LightLepton.at(2).v.Phi()));
-	  h.hist_l3[15]->Fill(delta_phi(LightLepton.at(1).v.Phi(),LightLepton.at(2).v.Phi()));
-	  h.hist_l3[16]->Fill(delta_phi(LightLepton.at(0).v.Phi(),*MET_phi));
-	  h.hist_l3[17]->Fill(delta_phi(LightLepton.at(1).v.Phi(),*MET_phi));
-	  h.hist_l3[18]->Fill(delta_phi(LightLepton.at(2).v.Phi(),*MET_phi));
-	  //------>Transverse Mass
-	  h.hist_l3[19]->Fill(transv_mass(LightLepton.at(0).v.Pt(),LightLepton.at(0).v.Phi(),*MET_pt,*MET_phi));
-	  h.hist_l3[20]->Fill(transv_mass(LightLepton.at(1).v.Pt(),LightLepton.at(1).v.Phi(),*MET_pt,*MET_phi));
-	  h.hist_l3[21]->Fill(transv_mass(LightLepton.at(2).v.Pt(),LightLepton.at(2).v.Phi(),*MET_pt,*MET_phi));
-	  //------>DeltaR Plots
-	  h.hist_l3[22]->Fill(LightLepton.at(0).v.DeltaR(LightLepton.at(1).v));
-	  h.hist_l3[23]->Fill(LightLepton.at(0).v.DeltaR(LightLepton.at(2).v));
-	  h.hist_l3[24]->Fill(LightLepton.at(1).v.DeltaR(LightLepton.at(2).v));
-	  //Invariant Mass
-	  h.hist_l3[25]->Fill((LightLepton.at(0).v+LightLepton.at(1).v).M());
-	  h.hist_l3[26]->Fill((LightLepton.at(0).v+LightLepton.at(2).v).M());
-	  h.hist_l3[27]->Fill((LightLepton.at(1).v+LightLepton.at(2).v).M());
-	}
-
-	//Event Level Variables for 2L SS events
-	if(is_l2SS_event){
-	  //------>Kinematics
-	  h.hist_l2SS[0]->Fill((int)LightLepton.size());
-	  h.hist_l2SS[1]->Fill(LightLepton.at(0).v.Pt());
-	  h.hist_l2SS[2]->Fill(LightLepton.at(1).v.Pt());
-	  h.hist_l2SS[3]->Fill(LightLepton.at(0).v.Eta());
-	  h.hist_l2SS[4]->Fill(LightLepton.at(1).v.Eta());
-	  h.hist_l2SS[5]->Fill(LightLepton.at(0).v.Phi());
-	  h.hist_l2SS[6]->Fill(LightLepton.at(1).v.Phi());
-	  //------>Event Level Kinematics
-	  h.hist_l2SS[7]->Fill(LT);
-	  h.hist_l2SS[8]->Fill(*MET_pt);
-	  h.hist_l2SS[9]->Fill(LT_MET);
-	  //------>Angular Variables
-	  h.hist_l2SS[10]->Fill(delta_phi(LightLepton.at(0).v.Phi(),LightLepton.at(1).v.Phi()));
-	  h.hist_l2SS[11]->Fill(delta_phi(LightLepton.at(0).v.Phi(),*MET_phi));
-	  h.hist_l2SS[12]->Fill(delta_phi(LightLepton.at(1).v.Phi(),*MET_phi));
-	  //------>Transverse Mass
-	  h.hist_l2SS[13]->Fill(transv_mass(LightLepton.at(0).v.Pt(),LightLepton.at(0).v.Phi(),*MET_pt,*MET_phi));
-	  h.hist_l2SS[14]->Fill(transv_mass(LightLepton.at(1).v.Pt(),LightLepton.at(1).v.Phi(),*MET_pt,*MET_phi));
-	  //------>DeltaR Plots
-	  h.hist_l2SS[15]->Fill(LightLepton.at(0).v.DeltaR(LightLepton.at(1).v));
-	  //Invariant Mass
-	  h.hist_l2SS[16]->Fill((LightLepton.at(0).v+LightLepton.at(1).v).M());
-	}
-	//Event level variables for 1L2J events
-	if(is_l12j_event){
-	  //Kinematics
-	  h.hist_l12j[0]->Fill((int)LightLepton.size());
-	  h.hist_l12j[1]->Fill((int)Jets.size());
-	  h.hist_l12j[2]->Fill(LightLepton.at(0).v.Pt());
-	  h.hist_l12j[3]->Fill(LightLepton.at(0).v.Eta());
-	  h.hist_l12j[4]->Fill(LightLepton.at(0).v.Phi());
-	  h.hist_l12j[5]->Fill(Jets.at(0).v.Pt());
-	  h.hist_l12j[6]->Fill(Jets.at(0).v.Eta());
-	  h.hist_l12j[7]->Fill(Jets.at(0).v.Phi());
-	  h.hist_l12j[8]->Fill(Jets.at(1).v.Pt());
-	  h.hist_l12j[9]->Fill(Jets.at(1).v.Eta());
-	  h.hist_l12j[10]->Fill(Jets.at(1).v.Phi());
-	  //------>Transverse Mass
-	  h.hist_l12j[11]->Fill(transv_mass(LightLepton.at(0).v.Pt(),LightLepton.at(0).v.Phi(),*MET_pt,*MET_phi));
-	  h.hist_l12j[12]->Fill(transv_mass(Jets.at(0).v.Pt(),Jets.at(0).v.Phi(),*MET_pt,*MET_phi));
-	  h.hist_l12j[13]->Fill(transv_mass(Jets.at(1).v.Pt(),Jets.at(1).v.Phi(),*MET_pt,*MET_phi));
-	  //Angular Variables
-	  h.hist_l12j[14]->Fill(delta_phi(LightLepton.at(0).v.Phi(),*MET_phi));
-	  h.hist_l12j[15]->Fill(delta_phi(Jets.at(0).v.Phi(),*MET_phi));
-	  h.hist_l12j[16]->Fill(delta_phi(Jets.at(1).v.Phi(),*MET_phi));
-	  h.hist_l12j[17]->Fill(delta_phi(Jets.at(0).v.Phi(),LightLepton.at(0).v.Phi()));
-	  h.hist_l12j[18]->Fill(delta_phi(Jets.at(1).v.Phi(),LightLepton.at(0).v.Phi()));
-	  h.hist_l12j[19]->Fill(delta_phi(Jets.at(0).v.Phi(),Jets.at(1).v.Phi()));
-	  h.hist_l12j[20]->Fill(delta_phi((Jets.at(0).v+Jets.at(1).v).Phi(),LightLepton.at(0).v.Phi()));
-	  h.hist_l12j[21]->Fill(delta_phi((Jets.at(0).v+Jets.at(1).v).Phi(),*MET_phi));
-	  h.hist_l12j[22]->Fill(delta_phi((Jets.at(0).v+Jets.at(1).v+LightLepton.at(0).v).Phi(),*MET_phi));
-	  h.hist_l12j[23]->Fill(delta_phi((Jets.at(0).v+Jets.at(1).v+LightLepton.at(0).v).Phi(),LightLepton.at(0).v.Phi()));
-	  h.hist_l12j[24]->Fill(delta_phi((Jets.at(0).v+Jets.at(1).v+LightLepton.at(0).v).Phi(),Jets.at(0).v.Phi()));
-	  h.hist_l12j[25]->Fill(delta_phi((Jets.at(0).v+Jets.at(1).v+LightLepton.at(0).v).Phi(),Jets.at(1).v.Phi()));
-	  //DiJet system
-	  h.hist_l12j[26]->Fill((Jets.at(0).v+Jets.at(1).v).M());
-	  h.hist_l12j[27]->Fill((Jets.at(0).v+Jets.at(1).v).Pt());
-	  h.hist_l12j[28]->Fill(transv_mass((Jets.at(0).v+Jets.at(1).v).Pt(),(Jets.at(0).v+Jets.at(1).v).Phi(),*MET_pt,*MET_phi));
-	  //dR
-	  h.hist_l12j[29]->Fill(Jets.at(0).v.DeltaR(Jets.at(1).v));
-	  //ljj system
-	  h.hist_l12j[30]->Fill((Jets.at(0).v+Jets.at(1).v+LightLepton.at(0).v).M());
-	  h.hist_l12j[31]->Fill((Jets.at(0).v+Jets.at(1).v+LightLepton.at(0).v).Pt());
-	  //Event Level Kinematics
-	  h.hist_l12j[32]->Fill(*MET_pt);
-	  h.hist_l12j[33]->Fill(HT);
-	  h.hist_l12j[34]->Fill(ST);
-	}
-	
       }
+      //Exactly 3L
+      if((int)LightLepton.size() == 3){
+	for(int i=0; i<3; i++){
+	  if( fabs(LightLepton.at(i).id) == 11 && LightLepton.at(i).v.Pt() > 32 )
+	    evt_trigger = true;
+	  if( fabs(LightLepton.at(i).id) == 13 && LightLepton.at(i).v.Pt() > 26 )
+	    evt_trigger = true;
+	}
+	if(evt_trigger){	  
+	  is_l3_event = true;
+	  n_l3++;
+	  h.acceptance[0]->Fill(2);
+	}
+      }
+      //2L SS
+      if((int)LightLepton.size()==2){
+	if((LightLepton.at(0).id)*(LightLepton.at(1).id) == 169 || (LightLepton.at(0).id)*(LightLepton.at(1).id) == 121 || (LightLepton.at(0).id)*(LightLepton.at(1).id) == 143){
+	  for(int i=0; i<2; i++){
+	    if( fabs(LightLepton.at(i).id) == 11 && LightLepton.at(i).v.Pt() > 32 )
+	      evt_trigger = true;
+	    if( fabs(LightLepton.at(i).id) == 13 && LightLepton.at(i).v.Pt() > 26 )
+	      evt_trigger = true;
+	  }
+	  if(evt_trigger){	  
+	    is_l2SS_event = true;
+	    n_l2SS++;
+	    h.acceptance[0]->Fill(3);
+	  }
+	}
+      }
+      //1L2J
+      else if((int)LightLepton.size()==1 && (int)Jets.size()>1){
+	if( fabs(LightLepton.at(0).id) == 11 && LightLepton.at(0).v.Pt() > 32 )
+	  evt_trigger = true;
+	if( fabs(LightLepton.at(0).id) == 13 && LightLepton.at(0).v.Pt() > 26 )
+	  evt_trigger = true;
+	if(evt_trigger){	  
+	  is_l12j_event = true;
+	  n_l12j++;
+	  h.acceptance[0]->Fill(4);
+	}
+      }
+      
+      //Event level variables for 4L Events
+      if(is_l4_event){
+	//------>Kinematics
+	h.hist_l4[0]->Fill((int)LightLepton.size());
+	h.hist_l4[1]->Fill(LightLepton.at(0).v.Pt());
+	h.hist_l4[2]->Fill(LightLepton.at(1).v.Pt());
+	h.hist_l4[3]->Fill(LightLepton.at(2).v.Pt());
+	h.hist_l4[4]->Fill(LightLepton.at(3).v.Pt());
+	h.hist_l4[5]->Fill(LightLepton.at(0).v.Eta());
+	h.hist_l4[6]->Fill(LightLepton.at(1).v.Eta());
+	h.hist_l4[7]->Fill(LightLepton.at(2).v.Eta());
+	h.hist_l4[8]->Fill(LightLepton.at(3).v.Eta());
+	h.hist_l4[9]->Fill(LightLepton.at(0).v.Phi());
+	h.hist_l4[10]->Fill(LightLepton.at(1).v.Phi());
+	h.hist_l4[11]->Fill(LightLepton.at(2).v.Phi());
+	h.hist_l4[12]->Fill(LightLepton.at(3).v.Phi());
+	//------>Event Level Kinematics
+	h.hist_l4[13]->Fill(LT);
+	h.hist_l4[14]->Fill(*MET_pt);
+	h.hist_l4[15]->Fill(LT_MET);
+	//------>Angular Variables
+	h.hist_l4[16]->Fill(delta_phi(LightLepton.at(0).v.Phi(),*MET_phi));
+	h.hist_l4[17]->Fill(delta_phi(LightLepton.at(1).v.Phi(),*MET_phi));
+	h.hist_l4[18]->Fill(delta_phi(LightLepton.at(2).v.Phi(),*MET_phi));
+	h.hist_l4[19]->Fill(delta_phi(LightLepton.at(3).v.Phi(),*MET_phi));
+	h.hist_l4[20]->Fill(delta_phi(LightLepton.at(0).v.Phi(),LightLepton.at(1).v.Phi()));
+	h.hist_l4[21]->Fill(delta_phi(LightLepton.at(0).v.Phi(),LightLepton.at(2).v.Phi()));
+	h.hist_l4[22]->Fill(delta_phi(LightLepton.at(0).v.Phi(),LightLepton.at(3).v.Phi()));
+	h.hist_l4[23]->Fill(delta_phi(LightLepton.at(1).v.Phi(),LightLepton.at(2).v.Phi()));
+	h.hist_l4[24]->Fill(delta_phi(LightLepton.at(1).v.Phi(),LightLepton.at(3).v.Phi()));
+	h.hist_l4[25]->Fill(delta_phi(LightLepton.at(2).v.Phi(),LightLepton.at(3).v.Phi()));
+	//------>Transverse Mass
+	h.hist_l4[26]->Fill(transv_mass(LightLepton.at(0).v.Pt(),LightLepton.at(0).v.Phi(),*MET_pt,*MET_phi));
+	h.hist_l4[27]->Fill(transv_mass(LightLepton.at(1).v.Pt(),LightLepton.at(1).v.Phi(),*MET_pt,*MET_phi));
+	h.hist_l4[28]->Fill(transv_mass(LightLepton.at(2).v.Pt(),LightLepton.at(2).v.Phi(),*MET_pt,*MET_phi));
+	h.hist_l4[29]->Fill(transv_mass(LightLepton.at(3).v.Pt(),LightLepton.at(3).v.Phi(),*MET_pt,*MET_phi));
+	//------>DeltaR Plots
+	h.hist_l4[30]->Fill(LightLepton.at(0).v.DeltaR(LightLepton.at(1).v));
+	h.hist_l4[31]->Fill(LightLepton.at(0).v.DeltaR(LightLepton.at(2).v));
+	h.hist_l4[32]->Fill(LightLepton.at(0).v.DeltaR(LightLepton.at(3).v));
+	h.hist_l4[33]->Fill(LightLepton.at(1).v.DeltaR(LightLepton.at(2).v));
+	h.hist_l4[34]->Fill(LightLepton.at(1).v.DeltaR(LightLepton.at(3).v));
+	h.hist_l4[35]->Fill(LightLepton.at(2).v.DeltaR(LightLepton.at(3).v));
+	//Invariant Mass
+	h.hist_l4[36]->Fill((LightLepton.at(0).v+LightLepton.at(1).v).M());
+	h.hist_l4[37]->Fill((LightLepton.at(0).v+LightLepton.at(2).v).M());
+	h.hist_l4[38]->Fill((LightLepton.at(0).v+LightLepton.at(3).v).M());
+	h.hist_l4[39]->Fill((LightLepton.at(1).v+LightLepton.at(2).v).M());
+	h.hist_l4[40]->Fill((LightLepton.at(1).v+LightLepton.at(3).v).M());
+	h.hist_l4[41]->Fill((LightLepton.at(2).v+LightLepton.at(3).v).M());
+      }
+	
+      //Event level Variables for 3L events
+      if(is_l3_event){
+	//------>Kinematics
+	h.hist_l3[0]->Fill((int)LightLepton.size());
+	h.hist_l3[1]->Fill(LightLepton.at(0).v.Pt());
+	h.hist_l3[2]->Fill(LightLepton.at(1).v.Pt());
+	h.hist_l3[3]->Fill(LightLepton.at(2).v.Pt());
+	h.hist_l3[4]->Fill(LightLepton.at(0).v.Eta());
+	h.hist_l3[5]->Fill(LightLepton.at(1).v.Eta());
+	h.hist_l3[6]->Fill(LightLepton.at(2).v.Eta());
+	h.hist_l3[7]->Fill(LightLepton.at(0).v.Phi());
+	h.hist_l3[8]->Fill(LightLepton.at(1).v.Phi());
+	h.hist_l3[9]->Fill(LightLepton.at(2).v.Phi());
+	//------>Event Level Kinematics
+	h.hist_l3[10]->Fill(LT);
+	h.hist_l3[11]->Fill(*MET_pt);
+	h.hist_l3[12]->Fill(LT_MET);
+	//------>Angular Variables
+	h.hist_l3[13]->Fill(delta_phi(LightLepton.at(0).v.Phi(),LightLepton.at(1).v.Phi()));
+	h.hist_l3[14]->Fill(delta_phi(LightLepton.at(0).v.Phi(),LightLepton.at(2).v.Phi()));
+	h.hist_l3[15]->Fill(delta_phi(LightLepton.at(1).v.Phi(),LightLepton.at(2).v.Phi()));
+	h.hist_l3[16]->Fill(delta_phi(LightLepton.at(0).v.Phi(),*MET_phi));
+	h.hist_l3[17]->Fill(delta_phi(LightLepton.at(1).v.Phi(),*MET_phi));
+	h.hist_l3[18]->Fill(delta_phi(LightLepton.at(2).v.Phi(),*MET_phi));
+	//------>Transverse Mass
+	h.hist_l3[19]->Fill(transv_mass(LightLepton.at(0).v.Pt(),LightLepton.at(0).v.Phi(),*MET_pt,*MET_phi));
+	h.hist_l3[20]->Fill(transv_mass(LightLepton.at(1).v.Pt(),LightLepton.at(1).v.Phi(),*MET_pt,*MET_phi));
+	h.hist_l3[21]->Fill(transv_mass(LightLepton.at(2).v.Pt(),LightLepton.at(2).v.Phi(),*MET_pt,*MET_phi));
+	//------>DeltaR Plots
+	h.hist_l3[22]->Fill(LightLepton.at(0).v.DeltaR(LightLepton.at(1).v));
+	h.hist_l3[23]->Fill(LightLepton.at(0).v.DeltaR(LightLepton.at(2).v));
+	h.hist_l3[24]->Fill(LightLepton.at(1).v.DeltaR(LightLepton.at(2).v));
+	//Invariant Mass
+	h.hist_l3[25]->Fill((LightLepton.at(0).v+LightLepton.at(1).v).M());
+	h.hist_l3[26]->Fill((LightLepton.at(0).v+LightLepton.at(2).v).M());
+	h.hist_l3[27]->Fill((LightLepton.at(1).v+LightLepton.at(2).v).M());
+      }
+
+      //Event Level Variables for 2L SS events
+      if(is_l2SS_event){
+	//------>Kinematics
+	h.hist_l2SS[0]->Fill((int)LightLepton.size());
+	h.hist_l2SS[1]->Fill(LightLepton.at(0).v.Pt());
+	h.hist_l2SS[2]->Fill(LightLepton.at(1).v.Pt());
+	h.hist_l2SS[3]->Fill(LightLepton.at(0).v.Eta());
+	h.hist_l2SS[4]->Fill(LightLepton.at(1).v.Eta());
+	h.hist_l2SS[5]->Fill(LightLepton.at(0).v.Phi());
+	h.hist_l2SS[6]->Fill(LightLepton.at(1).v.Phi());
+	//------>Event Level Kinematics
+	h.hist_l2SS[7]->Fill(LT);
+	h.hist_l2SS[8]->Fill(*MET_pt);
+	h.hist_l2SS[9]->Fill(LT_MET);
+	//------>Angular Variables
+	h.hist_l2SS[10]->Fill(delta_phi(LightLepton.at(0).v.Phi(),LightLepton.at(1).v.Phi()));
+	h.hist_l2SS[11]->Fill(delta_phi(LightLepton.at(0).v.Phi(),*MET_phi));
+	h.hist_l2SS[12]->Fill(delta_phi(LightLepton.at(1).v.Phi(),*MET_phi));
+	//------>Transverse Mass
+	h.hist_l2SS[13]->Fill(transv_mass(LightLepton.at(0).v.Pt(),LightLepton.at(0).v.Phi(),*MET_pt,*MET_phi));
+	h.hist_l2SS[14]->Fill(transv_mass(LightLepton.at(1).v.Pt(),LightLepton.at(1).v.Phi(),*MET_pt,*MET_phi));
+	//------>DeltaR Plots
+	h.hist_l2SS[15]->Fill(LightLepton.at(0).v.DeltaR(LightLepton.at(1).v));
+	//Invariant Mass
+	h.hist_l2SS[16]->Fill((LightLepton.at(0).v+LightLepton.at(1).v).M());
+      }
+      //Event level variables for 1L2J events
+      if(is_l12j_event){
+	//Kinematics
+	h.hist_l12j[0]->Fill((int)LightLepton.size());
+	h.hist_l12j[1]->Fill((int)Jets.size());
+	h.hist_l12j[2]->Fill(LightLepton.at(0).v.Pt());
+	h.hist_l12j[3]->Fill(Jets.at(0).v.Pt());
+	h.hist_l12j[4]->Fill(Jets.at(1).v.Pt());
+	h.hist_l12j[5]->Fill(LightLepton.at(0).v.Eta());
+	h.hist_l12j[6]->Fill(Jets.at(0).v.Eta());
+	h.hist_l12j[7]->Fill(Jets.at(1).v.Eta());
+	h.hist_l12j[8]->Fill(LightLepton.at(0).v.Phi());
+	h.hist_l12j[9]->Fill(Jets.at(0).v.Phi());
+	h.hist_l12j[10]->Fill(Jets.at(1).v.Phi());
+	//------>Transverse Mass
+	h.hist_l12j[11]->Fill(transv_mass(LightLepton.at(0).v.Pt(),LightLepton.at(0).v.Phi(),*MET_pt,*MET_phi));
+	h.hist_l12j[12]->Fill(transv_mass(Jets.at(0).v.Pt(),Jets.at(0).v.Phi(),*MET_pt,*MET_phi));
+	h.hist_l12j[13]->Fill(transv_mass(Jets.at(1).v.Pt(),Jets.at(1).v.Phi(),*MET_pt,*MET_phi));
+	//Angular Variables
+	h.hist_l12j[14]->Fill(delta_phi(LightLepton.at(0).v.Phi(),*MET_phi));
+	h.hist_l12j[15]->Fill(delta_phi(Jets.at(0).v.Phi(),*MET_phi));
+	h.hist_l12j[16]->Fill(delta_phi(Jets.at(1).v.Phi(),*MET_phi));
+	h.hist_l12j[17]->Fill(delta_phi(Jets.at(0).v.Phi(),LightLepton.at(0).v.Phi()));
+	h.hist_l12j[18]->Fill(delta_phi(Jets.at(1).v.Phi(),LightLepton.at(0).v.Phi()));
+	h.hist_l12j[19]->Fill(delta_phi(Jets.at(0).v.Phi(),Jets.at(1).v.Phi()));
+	h.hist_l12j[20]->Fill(delta_phi((Jets.at(0).v+Jets.at(1).v).Phi(),LightLepton.at(0).v.Phi()));
+	h.hist_l12j[21]->Fill(delta_phi((Jets.at(0).v+Jets.at(1).v).Phi(),*MET_phi));
+	h.hist_l12j[22]->Fill(delta_phi((Jets.at(0).v+Jets.at(1).v+LightLepton.at(0).v).Phi(),*MET_phi));
+	h.hist_l12j[23]->Fill(delta_phi((Jets.at(0).v+Jets.at(1).v+LightLepton.at(0).v).Phi(),LightLepton.at(0).v.Phi()));
+	h.hist_l12j[24]->Fill(delta_phi((Jets.at(0).v+Jets.at(1).v+LightLepton.at(0).v).Phi(),Jets.at(0).v.Phi()));
+	h.hist_l12j[25]->Fill(delta_phi((Jets.at(0).v+Jets.at(1).v+LightLepton.at(0).v).Phi(),Jets.at(1).v.Phi()));
+	//DiJet system
+	h.hist_l12j[26]->Fill((Jets.at(0).v+Jets.at(1).v).M());
+	h.hist_l12j[27]->Fill((Jets.at(0).v+Jets.at(1).v).Pt());
+	h.hist_l12j[28]->Fill(transv_mass((Jets.at(0).v+Jets.at(1).v).Pt(),(Jets.at(0).v+Jets.at(1).v).Phi(),*MET_pt,*MET_phi));
+	//dR
+	h.hist_l12j[29]->Fill(Jets.at(0).v.DeltaR(Jets.at(1).v));
+	//ljj system
+	h.hist_l12j[30]->Fill((Jets.at(0).v+Jets.at(1).v+LightLepton.at(0).v).M());
+	h.hist_l12j[31]->Fill((Jets.at(0).v+Jets.at(1).v+LightLepton.at(0).v).Pt());
+	//Event Level Kinematics
+	h.hist_l12j[32]->Fill(*MET_pt);
+	h.hist_l12j[33]->Fill(HT);
+	h.hist_l12j[34]->Fill(ST);
+      }
+      
     }//TriggeredEvts
   }//GoodEvt
   return kTRUE;

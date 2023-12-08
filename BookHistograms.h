@@ -1,6 +1,9 @@
 void AnaScript::BookHistograms(){
   h.nevt = new TH1F("nEvents","0-Total events, 1-Total events ran, 2-Total events with trigger applied",5,-1,4);
-  h.acceptance = new TH1F("Acceptance","Acceptance_0(N_Generated)_1(4L)_2(3L)_3(2LSS)_4(1L2J)",10,0,10);
+  h.acceptance[0] = new TH1F("Acceptance","Acceptance_0(N_Generated)_1(4L)_2(3L)_3(2LSS)_4(1L2J)",6,0,6);
+  h.acceptance[1] = new TH1F("finalstates_for_LL","Acceptance_0(N_Generated)_1(4L)_2(3L)_3(2LSS)_4(1L2J)",6,0,6);
+  h.acceptance[2] = new TH1F("finalstates_for_LN","Acceptance_0(N_Generated)_1(4L)_2(3L)_3(2LSS)_4(1L2J)",6,0,6);
+  h.acceptance[3] = new TH1F("finalstates_for_NN","Acceptance_0(N_Generated)_1(4L)_2(3L)_3(2LSS)_4(1L2J)",6,0,6);
 
   /******************************************************
    *    Object level plots: (before event selection)    *
